@@ -370,6 +370,7 @@ void HashTable<K,V,Prober,Hash,KEqual>::insert(const ItemType& p)
     this->table_[idx] = temp;
     occupiedSpaces++;
   }else{
+    delete this->table_[idx];
     this->table_[idx] = temp;
   }
 }
