@@ -35,7 +35,7 @@ struct LinearProber : public Prober<KeyType> {
     {
         // Complete the condition below that indicates failure
         // to find the key or an empty slot
-        if( /* Fill me in */ ) {
+        if( /* Fill me in */this->numProbes_ == this->m_ ) {
             return this->npos; 
         }
         HASH_INDEX_T loc = (this->start_ + this->numProbes_) % this->m_;
@@ -102,9 +102,13 @@ public:
     // To be completed
     HASH_INDEX_T next() 
     {
-
-
-
+      //i basically just copied the linear prober's next
+      if(this->numProbes_ == this->m_){
+        return this->npos;
+      }
+      HASH_INDEX_T loc = (this->start_+ (this->numProbes_ * this->dhstep_)) % this->m_;
+      this->numProbes_++;
+      return loc;
     }
 };
 
@@ -270,7 +274,8 @@ private:
     HASH_INDEX_T mIndex_;  // index to CAPACITIES
 
     // ADD MORE DATA MEMBERS HERE, AS NECESSARY
-
+    double resizeFactor;
+    size_t occupiedSpaces;
 };
 
 // ----------------------------------------------------------------------------
@@ -293,28 +298,49 @@ HashTable<K,V,Prober,Hash,KEqual>::HashTable(
        :  hash_(hash), kequal_(kequal), prober_(prober)
 {
     // Initialize any other data members as necessary
-
+  this->resizeFactor = resizeAlpha;
+  this->table_  = std::vector<HashItem*>(CAPACITIES[0], nullptr);
+  this->mIndex_ = 0;
+  this->totalProbes_= 0;
+  this->occupiedSpaces = 0;
 }
 
 // To be completed
 template<typename K, typename V, typename Prober, typename Hash, typename KEqual>
 HashTable<K,V,Prober,Hash,KEqual>::~HashTable()
 {
-
+  for(size_t i=0; i < table_.size(); i++){
+      if(table_[i]!= nullptr){
+          delete table_[i];
+          table_[i]= nullptr;
+      }
+  }
+  table_.clear();
 }
 
 // To be completed
 template<typename K, typename V, typename Prober, typename Hash, typename KEqual>
 bool HashTable<K,V,Prober,Hash,KEqual>::empty() const
 {
-
+  for(size_t i = 0; i < table_.size(); i++){
+      if(table_[i]!= nullptr && !table_[i]->deleted){
+          return false;
+      }
+  }
+  return true;
 }
 
 // To be completed
 template<typename K, typename V, typename Prober, typename Hash, typename KEqual>
 size_t HashTable<K,V,Prober,Hash,KEqual>::size() const
 {
-
+  size_t totalKeys = 0;
+  for(size_t i = 0; i < table_.size(); i++){
+      if(table_[i]!= nullptr && !table_[i]->deleted){
+          totalKeys++;
+      }
+  }
+  return totalKeys;
 }
 
 // To be completed
@@ -322,14 +348,45 @@ template<typename K, typename V, typename Prober, typename Hash, typename KEqual
 void HashTable<K,V,Prober,Hash,KEqual>::insert(const ItemType& p)
 {
 
-
+  //before insertion must check if we need to resize
+  ///if(loadingFactor>= alpha) resize;
+  //syntax is obvy off, just for nwo
+  //allocate a hashItem here
+  //throw logic_error if no location is found
+  //(probably when prober returns npos)
+  double loadingFactor = (double)this->occupiedSpaces/(double)CAPACITIES[mIndex_];
+  //std::cout << loadingFactor << std::endl;
+  //std::cout << size() << std::endl;
+  //std::cout << CAPACITIES[mIndex_] << std::endl;
+  if(loadingFactor >= resizeFactor){
+      this->resize();
+  }
+  HashItem* temp = new HashItem(p);
+  HASH_INDEX_T idx = probe(p.first);
+  if(idx == npos){
+      delete temp;
+      throw std::logic_error("No location found.");
+  }else if(this->table_[idx] == nullptr){
+    this->table_[idx] = temp;
+    occupiedSpaces++;
+  }else{
+    this->table_[idx] = temp;
+  }
 }
 
 // To be completed
 template<typename K, typename V, typename Prober, typename Hash, typename KEqual>
 void HashTable<K,V,Prober,Hash,KEqual>::remove(const KeyType& key)
 {
-
+  HASH_INDEX_T idx = probe(key);
+  if(idx == npos){
+      throw std::logic_error("Not found.");
+  }else{
+      if(table_[idx]==nullptr){
+        return;
+      }
+      this->table_[idx]->deleted = true;
+  }
 
 }
 
@@ -404,7 +461,27 @@ typename HashTable<K,V,Prober,Hash,KEqual>::HashItem* HashTable<K,V,Prober,Hash,
 template<typename K, typename V, typename Prober, typename Hash, typename KEqual>
 void HashTable<K,V,Prober,Hash,KEqual>::resize()
 {
+  //std::cout << "here" << std::endl;
+  mIndex_++;
+  if(mIndex_ >= 28){
+      throw std::logic_error("Can't resize anymore.");
+  }
+  //make a copy of the vector i think
+  std::vector<HashItem*> pastTable = table_;
+  size_t oldSize = pastTable.size();
+  table_ = std::vector<HashItem*>(CAPACITIES[mIndex_], nullptr);
 
+  //now just do the resize procedure
+  for(size_t i = 0; i < oldSize; i++){
+      if(pastTable[i]!= nullptr){
+          if(pastTable[i]->deleted){
+              delete pastTable[i];
+          }else{
+              table_[probe(pastTable[i]->item.first)] = pastTable[i];
+          }
+      }
+  }
+  occupiedSpaces = size();
     
 }
 
@@ -424,7 +501,7 @@ HASH_INDEX_T HashTable<K,V,Prober,Hash,KEqual>::probe(const KeyType& key) const
         }
         // fill in the condition for this else if statement which should 
         // return 'loc' if the given key exists at this location
-        else if(/* Fill me in */) {
+        else if(!table_[loc]->deleted && kequal_(table_[loc]->item.first,key)) {
             return loc;
         }
         loc = prober_.next();

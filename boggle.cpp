@@ -95,5 +95,32 @@ bool boggleHelper(const std::set<std::string>& dict, const std::set<std::string>
 								   std::string word, std::set<std::string>& result, unsigned int r, unsigned int c, int dr, int dc)
 {
 //add your solution here!
+//outline
+//we only go in the direction given to us by dr, dc
+//so what we should do is recurse in that direction
+//forming a word as we go, either we form a word(good and keep going)
+//or we're no longer a prefix(we can't form a word)
+//once we recurse back, only pick the biggest word
+  if(prefix.find(word)== prefix.end() || r == board.size() || c == board[0].size()){
+		return false;
+	}
+
+	word += board[r][c];
+	bool status = boggleHelper(dict,prefix,board,word,result,r+dr,c+dc,dr,dc);
+	//status is true if we found our word
+	//if we found our word keep returning true to get out of call stack
+	if(status){
+		return true;
+	}else{
+		//if we havent' found our word, check if our current call's word is in the dict
+		//if it status becomes true and will proceed as above for next calls
+		if(dict.find(word)!= dict.end()){
+			result.insert(word);
+			return true;
+		}else{
+			//otherwise we need to keep looking(although we may not end up inserting anything)
+			return false;
+		}
+	}
 
 }
